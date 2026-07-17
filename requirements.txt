@@ -1,0 +1,9 @@
+streamlit
+pdfplumber
+pydantic
+pandas
+plotly
+groq
+fpdf2
+pytest
+python-dotenv

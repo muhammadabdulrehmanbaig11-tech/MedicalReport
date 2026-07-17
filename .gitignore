@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Data and Uploads
+/data/*
+!/data/.gitkeep
+/uploads/*
+!/uploads/.gitkeep
+
+# SQLite
+*.sqlite3
+*.db
+
+# Streamlit
+.streamlit/secrets.toml
