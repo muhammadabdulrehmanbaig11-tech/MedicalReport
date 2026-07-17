@@ -1,17 +1,18 @@
 """
 MediLens AI - Main Streamlit Application Entry Point.
-Phase 1: PDF Validation and Text Extraction.
+Phase 2: Structured Laboratory Result Extraction and Deterministic Classification.
 """
 
 import streamlit as st
 from src.ingestion.pdf_extractor import extract_text_from_pdf_bytes
 from src.ingestion.exceptions import DocumentProcessingError
 from src.config import MAX_PDF_SIZE_BYTES
+from src.analysis import parse_laboratory_results
 
 def main():
-    st.set_page_config(page_title="MediLens AI", page_icon="🧬")
+    st.set_page_config(page_title="MediLens AI", page_icon="💊")
     st.title("MediLens AI")
-    st.info("Medical report analyser under development. (Phase 1)")
+    st.info("Medical report analyser under development. (Phase 2)")
 
     st.warning(
         "**Medical Disclaimer:** This tool extracts text from laboratory reports. "
@@ -41,11 +42,31 @@ def main():
                     
                     if result.warnings:
                         st.warning("**Warnings:**\n" + "\n".join(f"- {w}" for w in result.warnings))
+                        
+                    lab_results = parse_laboratory_results(result.extracted_text)
+                    
+                    if lab_results:
+                        st.write(f"**Detected Laboratory Results:** {len(lab_results)}")
+                        st.info("Low, Normal and High labels are calculated only from the reference ranges printed in the uploaded report. They are not a diagnosis.")
+                        
+                        table_data = []
+                        for r in lab_results:
+                            ref_str = r.reference_text if r.reference_text else ""
+                            unit_str = r.unit if r.unit else ""
+                            table_data.append({
+                                "Test": r.test_name,
+                                "Value": str(r.value),
+                                "Unit": unit_str,
+                                "Reference range": ref_str,
+                                "Status": r.status.value
+                            })
+                            
+                        st.table(table_data)
+                    else:
+                        st.info("No structured laboratory results could be detected reliably.")
 
                     with st.expander("Extracted Text (Read-Only)"):
                         st.text_area("Extracted Text", value=result.extracted_text, height=300, disabled=True)
-
-                    st.info("Note: No medical interpretation has been performed on this text.")
 
                 except DocumentProcessingError as e:
                     st.error(f"Error processing document: {str(e)}")
