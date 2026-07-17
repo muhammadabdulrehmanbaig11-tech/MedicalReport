@@ -1,6 +1,6 @@
 """
 MediLens AI - Main Streamlit Application Entry Point.
-Phase 3: Safe AI Explanation and Submission-Ready Streamlit Interface.
+Phase 4: Secure Downloadable PDF Summary.
 """
 
 import os
@@ -10,11 +10,12 @@ from src.ingestion.exceptions import DocumentProcessingError
 from src.config import MAX_PDF_SIZE_BYTES, GROQ_API_KEY_ENV_VAR
 from src.analysis import parse_laboratory_results
 from src.services import generate_plain_language_explanation
+from src.export import generate_report_summary_pdf, ReportExportError
 
 def main():
     st.set_page_config(page_title="MediLens AI", page_icon="💊")
     st.title("MediLens AI")
-    st.info("Medical report analyser under development. (Phase 3)")
+    st.info("Medical report analyser under development. (Phase 4)")
 
     st.warning(
         "**Medical Disclaimer:** This tool extracts text from laboratory reports. "
@@ -45,8 +46,11 @@ def main():
                     if result.warnings:
                         st.warning("**Warnings:**\n" + "\n".join(f"- {w}" for w in result.warnings))
                         
-                    # Save results to session state so they persist when checkbox is toggled
+                    # Save results to session state so they persist
+                    # Clear any old AI explanation from previous reports
                     st.session_state['extracted_text'] = result.extracted_text
+                    if 'ai_explanation' in st.session_state:
+                        del st.session_state['ai_explanation']
                 except DocumentProcessingError as e:
                     st.error(f"Error processing document: {str(e)}")
                 except Exception:
@@ -73,6 +77,21 @@ def main():
                     
                 st.table(table_data)
 
+                # PDF Export Section
+                try:
+                    ai_text = st.session_state.get('ai_explanation')
+                    pdf_bytes = generate_report_summary_pdf(lab_results, ai_explanation=ai_text)
+                    st.download_button(
+                        label="Download PDF Summary",
+                        data=pdf_bytes,
+                        file_name="medilens-medical-report-summary.pdf",
+                        mime="application/pdf"
+                    )
+                except ReportExportError as e:
+                    st.error(f"Could not generate PDF summary: {str(e)}")
+                except Exception:
+                    st.error("An unexpected error occurred while generating the PDF summary.")
+
                 st.markdown("---")
                 st.write("**AI Explanation**")
                 st.info(
@@ -87,11 +106,21 @@ def main():
                     elif st.button("Generate Plain-Language Explanation"):
                         with st.spinner("Generating explanation..."):
                             explanation = generate_plain_language_explanation(lab_results)
-                            st.write("### Explanation")
-                            st.write(explanation.summary_text)
-                            st.caption(explanation.safety_disclaimer)
-                            for w in explanation.warnings:
-                                st.warning(w)
+                            if explanation.ai_used:
+                                st.session_state['ai_explanation'] = explanation.summary_text
+                                # Re-run to update the PDF download button with the new explanation
+                                st.rerun()
+                            else:
+                                st.write("### Explanation")
+                                st.write(explanation.summary_text)
+                                st.caption(explanation.safety_disclaimer)
+                                for w in explanation.warnings:
+                                    st.warning(w)
+
+                if 'ai_explanation' in st.session_state:
+                    st.write("### Explanation")
+                    st.write(st.session_state['ai_explanation'])
+                    st.caption("This AI-generated explanation is for general educational purposes only. It is not a diagnosis, treatment plan or substitute for advice from a qualified healthcare professional.")
 
             else:
                 st.info("No structured laboratory results could be detected reliably.")
